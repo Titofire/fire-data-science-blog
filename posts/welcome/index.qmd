@@ -1,0 +1,28 @@
+---
+title: "Welcome to Fire Service Data Science"
+date: "2026-10-18"
+categories: [news]
+description: "Why this blog exists and what to expect."
+---
+
+Fire departments generate a lot of data: every call, every unit, every
+timestamp. Most of it ends up in a report that gets filed and forgotten. This
+blog is about putting that data to work.
+
+## What to expect
+
+- **Response time analysis:** where the minutes actually go, from call
+  received to arrival on scene.
+- **Station and unit coverage:** who can get where, and how fast.
+- **Demand patterns:** when and where calls happen, and what that means for
+  staffing.
+- **Community risk reduction:** using data to target prevention where it
+  matters most.
+
+Posts include the R code behind every chart, so you can run the same analysis
+on your own department's data.
+
+## A note on data
+
+Everything published here uses aggregated, de-identified, public, or simulated
+data. Incident addresses and patient information never appear on this site.

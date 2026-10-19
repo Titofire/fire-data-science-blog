@@ -1,0 +1,22 @@
+---
+title: "About"
+about:
+  template: jolla
+  links:
+    - icon: github
+      text: GitHub
+      href: https://github.com/Titofire
+---
+
+This blog explores how data science can help fire departments make better
+decisions: response times, station coverage, staffing, community risk
+reduction, and more.
+
+<!-- TODO: add a short bio: your role, your department or region, and why
+you started this blog. -->
+
+## Disclaimer
+
+The views expressed here are my own and do not represent any fire department
+or agency. Analyses use only aggregated, de-identified, publicly available, or
+simulated data.

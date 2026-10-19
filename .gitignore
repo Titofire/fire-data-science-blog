@@ -1,0 +1,23 @@
+# Raw / sensitive data - never commit
+data/raw/
+*.accdb
+*.mdb
+
+# Quarto build output
+/.quarto/
+/_site/
+/_freeze/
+
+# Python / R
+__pycache__/
+.ipynb_checkpoints/
+.venv/
+venv/
+.Rhistory
+.RData
+.Rproj.user/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/

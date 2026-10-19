@@ -1,0 +1,599 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss  xmlns:atom="http://www.w3.org/2005/Atom" 
+      xmlns:media="http://search.yahoo.com/mrss/" 
+      xmlns:content="http://purl.org/rss/1.0/modules/content/" 
+      xmlns:dc="http://purl.org/dc/elements/1.1/" 
+      version="2.0">
+<channel>
+<title>Fire Service Data Science</title>
+<link>https://titofire.github.io/fire-data-science-blog/</link>
+<atom:link href="https://titofire.github.io/fire-data-science-blog/index.xml" rel="self" type="application/rss+xml"/>
+<description>Using data to make better decisions in the fire service.</description>
+<generator>quarto-1.10.19</generator>
+<lastBuildDate>Sun, 18 Oct 2026 04:00:00 GMT</lastBuildDate>
+<item>
+  <title>When Do Calls Happen? Response Times by Hour of Day</title>
+  <link>https://titofire.github.io/fire-data-science-blog/posts/response-times-by-hour/</link>
+  <description><![CDATA[ 
+
+
+
+
+
+
+<p>Call volume isn’t flat across the day, and neither are response times. This post walks through a simple analysis you can run on your own CAD export: calls per hour, and how the 90th-percentile response time shifts as the day goes on.</p>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>Simulated data
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>The data in this post is <strong>simulated</strong> to look like a typical mid-sized department. Swap in your own CAD export to run it for real.</p>
+</div>
+</div>
+<div class="cell">
+<details open="" class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb1" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">library</span>(dplyr)</span>
+<span id="cb1-2"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">library</span>(ggplot2)</span>
+<span id="cb1-3"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">library</span>(lubridate)</span>
+<span id="cb1-4"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">library</span>(scales)</span></code></pre></div></div>
+</details>
+</div>
+<section id="simulating-a-year-of-incidents" class="level2">
+<h2 class="anchored" data-anchor-id="simulating-a-year-of-incidents">Simulating a year of incidents</h2>
+<p>Real call volume usually bottoms out around 4–5 AM and peaks in the late afternoon. We simulate that shape, then give each call a response time that gets a little slower during busy hours, when more units are already committed.</p>
+<div class="cell">
+<details open="" class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb2" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">set.seed</span>(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2026</span>)</span>
+<span id="cb2-2"></span>
+<span id="cb2-3"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Relative call likelihood by hour (0 = midnight)</span></span>
+<span id="cb2-4">hourly_shape <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">c</span>(<span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.55</span>, <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.45</span>, <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.40</span>, <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.35</span>, <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.32</span>, <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.35</span>, <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.50</span>, <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.70</span>,</span>
+<span id="cb2-5">                  <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.85</span>, <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.95</span>, <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1.00</span>, <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1.05</span>, <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1.10</span>, <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1.10</span>, <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1.12</span>, <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1.15</span>,</span>
+<span id="cb2-6">                  <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1.20</span>, <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1.20</span>, <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1.15</span>, <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1.05</span>, <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.95</span>, <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.85</span>, <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.75</span>, <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.65</span>)</span>
+<span id="cb2-7"></span>
+<span id="cb2-8">n_calls <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">12000</span></span>
+<span id="cb2-9">hours <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">sample</span>(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">23</span>, n_calls, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">replace =</span> <span class="cn" style="color: #8f5902;
+background-color: null;
+font-style: inherit;">TRUE</span>, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">prob =</span> hourly_shape)</span>
+<span id="cb2-10"></span>
+<span id="cb2-11">incidents <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">tibble</span>(</span>
+<span id="cb2-12">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">received =</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">as_datetime</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"2025-01-01"</span>) <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span></span>
+<span id="cb2-13">    <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">days</span>(<span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">sample</span>(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">364</span>, n_calls, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">replace =</span> <span class="cn" style="color: #8f5902;
+background-color: null;
+font-style: inherit;">TRUE</span>)) <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span></span>
+<span id="cb2-14">    <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">hours</span>(hours) <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">minutes</span>(<span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">sample</span>(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span><span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">:</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">59</span>, n_calls, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">replace =</span> <span class="cn" style="color: #8f5902;
+background-color: null;
+font-style: inherit;">TRUE</span>)),</span>
+<span id="cb2-15">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">hour =</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">hour</span>(received),</span>
+<span id="cb2-16">  <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Response time in minutes: log-normal, slower when demand is high</span></span>
+<span id="cb2-17">  <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">response_min =</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">rlnorm</span>(n_calls,</span>
+<span id="cb2-18">                        <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">meanlog =</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">log</span>(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">6</span>) <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.15</span> <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">*</span> (hourly_shape[hour <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>] <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>),</span>
+<span id="cb2-19">                        <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">sdlog =</span> <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.35</span>)</span>
+<span id="cb2-20">)</span>
+<span id="cb2-21"></span>
+<span id="cb2-22"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">head</span>(incidents)</span></code></pre></div></div>
+</details>
+<div class="cell-output cell-output-stdout">
+<pre><code># A tibble: 6 × 3
+  received             hour response_min
+  &lt;dttm&gt;              &lt;int&gt;        &lt;dbl&gt;
+1 2025-09-18 21:06:00    21         7.49
+2 2025-02-01 10:11:00    10         3.28
+3 2025-11-28 15:22:00    15         3.91
+4 2025-01-29 14:49:00    14         4.83
+5 2025-02-21 10:09:00    10         6.03
+6 2025-02-22 17:36:00    17         8.62</code></pre>
+</div>
+</div>
+</section>
+<section id="calls-by-hour" class="level2">
+<h2 class="anchored" data-anchor-id="calls-by-hour">Calls by hour</h2>
+<div class="cell">
+<details open="" class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb4" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb4-1">incidents <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">|&gt;</span></span>
+<span id="cb4-2">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">count</span>(hour) <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">|&gt;</span></span>
+<span id="cb4-3">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">ggplot</span>(<span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">aes</span>(hour, n)) <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span></span>
+<span id="cb4-4">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">geom_col</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">fill =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"#b22222"</span>) <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span></span>
+<span id="cb4-5">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">scale_x_continuous</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">breaks =</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">seq</span>(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">23</span>, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">3</span>)) <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span></span>
+<span id="cb4-6">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">scale_y_continuous</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">labels =</span> comma) <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span></span>
+<span id="cb4-7">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">labs</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">x =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"Hour of day"</span>, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">y =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"Incidents"</span>) <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span></span>
+<span id="cb4-8">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">theme_minimal</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">base_size =</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">13</span>)</span></code></pre></div></div>
+</details>
+<div class="cell-output-display">
+<div id="fig-calls-by-hour" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-calls-by-hour-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="https://titofire.github.io/fire-data-science-blog/posts/response-times-by-hour/index_files/figure-html/fig-calls-by-hour-1.png" class="img-fluid figure-img" width="672">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-calls-by-hour-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;1: Total incidents by hour of day (simulated, one year).
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="response-times-by-hour" class="level2">
+<h2 class="anchored" data-anchor-id="response-times-by-hour">Response times by hour</h2>
+<p>Averages hide the slow calls that matter most, so the fire service usually reports the <strong>90th percentile</strong>: 9 out of 10 calls are answered at least this fast.</p>
+<div class="cell">
+<details open="" class="code-fold">
+<summary>Code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb5" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1">by_hour <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> incidents <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">|&gt;</span></span>
+<span id="cb5-2">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">group_by</span>(hour) <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">|&gt;</span></span>
+<span id="cb5-3">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">summarise</span>(</span>
+<span id="cb5-4">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">median =</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">median</span>(response_min),</span>
+<span id="cb5-5">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">p90 =</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">quantile</span>(response_min, <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.9</span>),</span>
+<span id="cb5-6">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">.groups =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"drop"</span></span>
+<span id="cb5-7">  )</span>
+<span id="cb5-8"></span>
+<span id="cb5-9"><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">ggplot</span>(by_hour, <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">aes</span>(hour)) <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span></span>
+<span id="cb5-10">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">geom_line</span>(<span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">aes</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">y =</span> p90, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">colour =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"90th percentile"</span>), <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">linewidth =</span> <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1.1</span>) <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span></span>
+<span id="cb5-11">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">geom_line</span>(<span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">aes</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">y =</span> median, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">colour =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"Median"</span>), <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">linewidth =</span> <span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1.1</span>) <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span></span>
+<span id="cb5-12">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">scale_colour_manual</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">values =</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">c</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"90th percentile"</span> <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">=</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"#b22222"</span>,</span>
+<span id="cb5-13">                                 <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"Median"</span> <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">=</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"#555555"</span>)) <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span></span>
+<span id="cb5-14">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">scale_x_continuous</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">breaks =</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">seq</span>(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">23</span>, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">3</span>)) <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span></span>
+<span id="cb5-15">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">labs</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">x =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"Hour of day"</span>, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">y =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"Response time (minutes)"</span>, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">colour =</span> <span class="cn" style="color: #8f5902;
+background-color: null;
+font-style: inherit;">NULL</span>) <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span></span>
+<span id="cb5-16">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">theme_minimal</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">base_size =</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">13</span>) <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span></span>
+<span id="cb5-17">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">theme</span>(<span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">legend.position =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"top"</span>)</span></code></pre></div></div>
+</details>
+<div class="cell-output-display">
+<div id="fig-p90-by-hour" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-p90-by-hour-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="https://titofire.github.io/fire-data-science-blog/posts/response-times-by-hour/index_files/figure-html/fig-p90-by-hour-1.png" class="img-fluid figure-img" width="672">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-p90-by-hour-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;2: Median and 90th-percentile response time by hour of day (simulated).
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="takeaways" class="level2">
+<h2 class="anchored" data-anchor-id="takeaways">Takeaways</h2>
+<ul>
+<li>Demand more than triples between the early-morning low and the late-afternoon peak.</li>
+<li>Response times stretch during the busiest hours, which is exactly when more residents are calling.</li>
+<li>This is a starting point. Next steps are breaking it down by station, by call type, and by which segment of the response (call processing, turnout, or travel) is driving the delay.</li>
+</ul>
+</section>
+<section id="try-it-with-your-own-data" class="level2">
+<h2 class="anchored" data-anchor-id="try-it-with-your-own-data">Try it with your own data</h2>
+<p>Replace the simulation with your CAD export. You need at least a call-received timestamp and an arrival timestamp:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6" style="background: #f1f3f5;"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1">incidents <span class="ot" style="color: #003B4F;
+background-color: null;
+font-style: inherit;">&lt;-</span> readr<span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">::</span><span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">read_csv</span>(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"data/raw/cad_export.csv"</span>) <span class="sc" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">|&gt;</span></span>
+<span id="cb6-2">  <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">mutate</span>(</span>
+<span id="cb6-3">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">hour =</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">hour</span>(received),</span>
+<span id="cb6-4">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">response_min =</span> <span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">as.numeric</span>(<span class="fu" style="color: #4758AB;
+background-color: null;
+font-style: inherit;">difftime</span>(arrived, received, <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">units =</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"mins"</span>))</span>
+<span id="cb6-5">  )</span></code></pre></div></div>
+<p>Keep raw exports in <code>data/raw/</code>. That folder is excluded from Git, so it never ends up on GitHub.</p>
+
+
+<!-- -->
+
+</section>
+
+ ]]></description>
+  <category>response times</category>
+  <category>demand</category>
+  <category>R</category>
+  <guid>https://titofire.github.io/fire-data-science-blog/posts/response-times-by-hour/</guid>
+  <pubDate>Sun, 18 Oct 2026 04:00:00 GMT</pubDate>
+</item>
+<item>
+  <title>Welcome to Fire Service Data Science</title>
+  <link>https://titofire.github.io/fire-data-science-blog/posts/welcome/</link>
+  <description><![CDATA[ 
+
+
+
+
+
+
+<p>Fire departments generate a lot of data: every call, every unit, every timestamp. Most of it ends up in a report that gets filed and forgotten. This blog is about putting that data to work.</p>
+<section id="what-to-expect" class="level2">
+<h2 class="anchored" data-anchor-id="what-to-expect">What to expect</h2>
+<ul>
+<li><strong>Response time analysis:</strong> where the minutes actually go, from call received to arrival on scene.</li>
+<li><strong>Station and unit coverage:</strong> who can get where, and how fast.</li>
+<li><strong>Demand patterns:</strong> when and where calls happen, and what that means for staffing.</li>
+<li><strong>Community risk reduction:</strong> using data to target prevention where it matters most.</li>
+</ul>
+<p>Posts include the R code behind every chart, so you can run the same analysis on your own department’s data.</p>
+</section>
+<section id="a-note-on-data" class="level2">
+<h2 class="anchored" data-anchor-id="a-note-on-data">A note on data</h2>
+<p>Everything published here uses aggregated, de-identified, public, or simulated data. Incident addresses and patient information never appear on this site.</p>
+
+
+<!-- -->
+
+</section>
+
+ ]]></description>
+  <category>news</category>
+  <guid>https://titofire.github.io/fire-data-science-blog/posts/welcome/</guid>
+  <pubDate>Sun, 18 Oct 2026 04:00:00 GMT</pubDate>
+</item>
+</channel>
+</rss>

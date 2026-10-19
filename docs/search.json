@@ -1,0 +1,86 @@
+[
+  {
+    "objectID": "posts/welcome/index.html",
+    "href": "posts/welcome/index.html",
+    "title": "Welcome to Fire Service Data Science",
+    "section": "",
+    "text": "Fire departments generate a lot of data: every call, every unit, every timestamp. Most of it ends up in a report that gets filed and forgotten. This blog is about putting that data to work."
+  },
+  {
+    "objectID": "posts/welcome/index.html#what-to-expect",
+    "href": "posts/welcome/index.html#what-to-expect",
+    "title": "Welcome to Fire Service Data Science",
+    "section": "What to expect",
+    "text": "What to expect\n\nResponse time analysis: where the minutes actually go, from call received to arrival on scene.\nStation and unit coverage: who can get where, and how fast.\nDemand patterns: when and where calls happen, and what that means for staffing.\nCommunity risk reduction: using data to target prevention where it matters most.\n\nPosts include the R code behind every chart, so you can run the same analysis on your own department’s data."
+  },
+  {
+    "objectID": "posts/welcome/index.html#a-note-on-data",
+    "href": "posts/welcome/index.html#a-note-on-data",
+    "title": "Welcome to Fire Service Data Science",
+    "section": "A note on data",
+    "text": "A note on data\nEverything published here uses aggregated, de-identified, public, or simulated data. Incident addresses and patient information never appear on this site."
+  },
+  {
+    "objectID": "index.html",
+    "href": "index.html",
+    "title": "Fire Service Data Science",
+    "section": "",
+    "text": "When Do Calls Happen? Response Times by Hour of Day\n\n\n\nresponse times\n\ndemand\n\nR\n\n\n\nA first look at how call volume and response times change over the day, using simulated data.\n\n\n\n\n\nOct 18, 2026\n\n\n\n\n\n\n\n\n\n\n\n\nWelcome to Fire Service Data Science\n\n\n\nnews\n\n\n\nWhy this blog exists and what to expect.\n\n\n\n\n\nOct 18, 2026\n\n\n\n\n\nNo matching items"
+  },
+  {
+    "objectID": "about.html",
+    "href": "about.html",
+    "title": "About",
+    "section": "",
+    "text": "This blog explores how data science can help fire departments make better decisions: response times, station coverage, staffing, community risk reduction, and more."
+  },
+  {
+    "objectID": "about.html#disclaimer",
+    "href": "about.html#disclaimer",
+    "title": "About",
+    "section": "Disclaimer",
+    "text": "Disclaimer\nThe views expressed here are my own and do not represent any fire department or agency. Analyses use only aggregated, de-identified, publicly available, or simulated data."
+  },
+  {
+    "objectID": "posts/response-times-by-hour/index.html",
+    "href": "posts/response-times-by-hour/index.html",
+    "title": "When Do Calls Happen? Response Times by Hour of Day",
+    "section": "",
+    "text": "Call volume isn’t flat across the day, and neither are response times. This post walks through a simple analysis you can run on your own CAD export: calls per hour, and how the 90th-percentile response time shifts as the day goes on.\nCode\nlibrary(dplyr)\nlibrary(ggplot2)\nlibrary(lubridate)\nlibrary(scales)"
+  },
+  {
+    "objectID": "posts/response-times-by-hour/index.html#simulating-a-year-of-incidents",
+    "href": "posts/response-times-by-hour/index.html#simulating-a-year-of-incidents",
+    "title": "When Do Calls Happen? Response Times by Hour of Day",
+    "section": "Simulating a year of incidents",
+    "text": "Simulating a year of incidents\nReal call volume usually bottoms out around 4–5 AM and peaks in the late afternoon. We simulate that shape, then give each call a response time that gets a little slower during busy hours, when more units are already committed.\n\n\nCode\nset.seed(2026)\n\n# Relative call likelihood by hour (0 = midnight)\nhourly_shape &lt;- c(0.55, 0.45, 0.40, 0.35, 0.32, 0.35, 0.50, 0.70,\n                  0.85, 0.95, 1.00, 1.05, 1.10, 1.10, 1.12, 1.15,\n                  1.20, 1.20, 1.15, 1.05, 0.95, 0.85, 0.75, 0.65)\n\nn_calls &lt;- 12000\nhours &lt;- sample(0:23, n_calls, replace = TRUE, prob = hourly_shape)\n\nincidents &lt;- tibble(\n  received = as_datetime(\"2025-01-01\") +\n    days(sample(0:364, n_calls, replace = TRUE)) +\n    hours(hours) + minutes(sample(0:59, n_calls, replace = TRUE)),\n  hour = hour(received),\n  # Response time in minutes: log-normal, slower when demand is high\n  response_min = rlnorm(n_calls,\n                        meanlog = log(6) + 0.15 * (hourly_shape[hour + 1] - 1),\n                        sdlog = 0.35)\n)\n\nhead(incidents)\n\n\n# A tibble: 6 × 3\n  received             hour response_min\n  &lt;dttm&gt;              &lt;int&gt;        &lt;dbl&gt;\n1 2025-09-18 21:06:00    21         7.49\n2 2025-02-01 10:11:00    10         3.28\n3 2025-11-28 15:22:00    15         3.91\n4 2025-01-29 14:49:00    14         4.83\n5 2025-02-21 10:09:00    10         6.03\n6 2025-02-22 17:36:00    17         8.62"
+  },
+  {
+    "objectID": "posts/response-times-by-hour/index.html#calls-by-hour",
+    "href": "posts/response-times-by-hour/index.html#calls-by-hour",
+    "title": "When Do Calls Happen? Response Times by Hour of Day",
+    "section": "Calls by hour",
+    "text": "Calls by hour\n\n\nCode\nincidents |&gt;\n  count(hour) |&gt;\n  ggplot(aes(hour, n)) +\n  geom_col(fill = \"#b22222\") +\n  scale_x_continuous(breaks = seq(0, 23, 3)) +\n  scale_y_continuous(labels = comma) +\n  labs(x = \"Hour of day\", y = \"Incidents\") +\n  theme_minimal(base_size = 13)\n\n\n\n\n\n\n\n\nFigure 1: Total incidents by hour of day (simulated, one year)."
+  },
+  {
+    "objectID": "posts/response-times-by-hour/index.html#response-times-by-hour",
+    "href": "posts/response-times-by-hour/index.html#response-times-by-hour",
+    "title": "When Do Calls Happen? Response Times by Hour of Day",
+    "section": "Response times by hour",
+    "text": "Response times by hour\nAverages hide the slow calls that matter most, so the fire service usually reports the 90th percentile: 9 out of 10 calls are answered at least this fast.\n\n\nCode\nby_hour &lt;- incidents |&gt;\n  group_by(hour) |&gt;\n  summarise(\n    median = median(response_min),\n    p90 = quantile(response_min, 0.9),\n    .groups = \"drop\"\n  )\n\nggplot(by_hour, aes(hour)) +\n  geom_line(aes(y = p90, colour = \"90th percentile\"), linewidth = 1.1) +\n  geom_line(aes(y = median, colour = \"Median\"), linewidth = 1.1) +\n  scale_colour_manual(values = c(\"90th percentile\" = \"#b22222\",\n                                 \"Median\" = \"#555555\")) +\n  scale_x_continuous(breaks = seq(0, 23, 3)) +\n  labs(x = \"Hour of day\", y = \"Response time (minutes)\", colour = NULL) +\n  theme_minimal(base_size = 13) +\n  theme(legend.position = \"top\")\n\n\n\n\n\n\n\n\nFigure 2: Median and 90th-percentile response time by hour of day (simulated)."
+  },
+  {
+    "objectID": "posts/response-times-by-hour/index.html#takeaways",
+    "href": "posts/response-times-by-hour/index.html#takeaways",
+    "title": "When Do Calls Happen? Response Times by Hour of Day",
+    "section": "Takeaways",
+    "text": "Takeaways\n\nDemand more than triples between the early-morning low and the late-afternoon peak.\nResponse times stretch during the busiest hours, which is exactly when more residents are calling.\nThis is a starting point. Next steps are breaking it down by station, by call type, and by which segment of the response (call processing, turnout, or travel) is driving the delay."
+  },
+  {
+    "objectID": "posts/response-times-by-hour/index.html#try-it-with-your-own-data",
+    "href": "posts/response-times-by-hour/index.html#try-it-with-your-own-data",
+    "title": "When Do Calls Happen? Response Times by Hour of Day",
+    "section": "Try it with your own data",
+    "text": "Try it with your own data\nReplace the simulation with your CAD export. You need at least a call-received timestamp and an arrival timestamp:\nincidents &lt;- readr::read_csv(\"data/raw/cad_export.csv\") |&gt;\n  mutate(\n    hour = hour(received),\n    response_min = as.numeric(difftime(arrived, received, units = \"mins\"))\n  )\nKeep raw exports in data/raw/. That folder is excluded from Git, so it never ends up on GitHub."
+  }
+]

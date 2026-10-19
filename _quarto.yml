@@ -1,0 +1,38 @@
+project:
+  type: website
+  output-dir: docs
+  render:
+    - "*.qmd"
+    - "posts/**/*.qmd"
+  post-render:
+    - _scripts/nojekyll.R
+
+website:
+  title: "Fire Service Data Science"
+  description: "Using data to make better decisions in the fire service."
+  site-url: "https://titofire.github.io/fire-data-science-blog/"
+  repo-url: "https://github.com/Titofire/fire-data-science-blog"
+  navbar:
+    right:
+      - href: index.qmd
+        text: Posts
+      - about.qmd
+      - icon: github
+        href: https://github.com/Titofire/fire-data-science-blog
+      - icon: rss
+        href: index.xml
+  page-footer:
+    left: "Analyses use aggregated or de-identified data only."
+    right: "Built with [Quarto](https://quarto.org/)"
+
+format:
+  html:
+    theme:
+      light: [flatly, styles.scss]
+      dark: [darkly, styles.scss]
+    toc: true
+    code-fold: show
+    code-tools: true
+
+execute:
+  freeze: auto
